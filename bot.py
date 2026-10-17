@@ -67,7 +67,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
       await update.message.reply_text(
           f"✅ সফলভাবে ট্র্যাকিং লিস্টে যুক্ত হয়েছে!\n🔗 লিংক: {url}\n🎯 টার্গেট"
-          f" দাম: {target_price} টাকা\n\nদাম কমলেই বট আপনাকে অ্যালার্ট পাঠাবে!"
+          f" দাম: ₹{target_price} টাকা\n\nদাম কমলেই বট আপনাকে অ্যালার্ট পাঠাবে!"
       )
     except ValueError:
       await update.message.reply_text(

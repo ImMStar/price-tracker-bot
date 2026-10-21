@@ -38,7 +38,8 @@ def run_health_server():
 
 
 # ---- downloader ----
-def download_media(url: str, out_dir: str, kind: str) -> str:
+def download_media(url: str, out_dir: str, kind: str):
+    """Returns (file_path, caption_text)."""
     opts = {
         "outtmpl": os.path.join(out_dir, "%(id)s.%(ext)s"),
         "quiet": True,
@@ -61,11 +62,14 @@ def download_media(url: str, out_dir: str, kind: str) -> str:
         opts["cookiefile"] = "cookies.txt"
 
     with yt_dlp.YoutubeDL(opts) as ydl:
-        ydl.download([url])
+        info = ydl.extract_info(url, download=True)
     files = glob.glob(os.path.join(out_dir, "*"))
     if not files:
         raise RuntimeError("Nothing downloaded")
-    return files[0]
+    caption = (info.get("description") or info.get("title") or "").strip()
+    if len(caption) > 1000:  # Telegram caption limit is 1024 characters
+        caption = caption[:997] + "..."
+    return files[0], caption
 
 
 # ---- handlers ----
@@ -102,16 +106,18 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text("Downloading... ⏳")
     try:
         with tempfile.TemporaryDirectory() as tmp:
-            path = await asyncio.to_thread(download_media, url, tmp, kind)
+            path, caption = await asyncio.to_thread(download_media, url, tmp, kind)
             if os.path.getsize(path) > MAX_SIZE:
                 await query.edit_message_text("File is larger than Telegram's 50 MB bot limit.")
                 return
             chat_id = query.message.chat_id
             with open(path, "rb") as f:
                 if kind == "audio":
-                    await context.bot.send_audio(chat_id, f)
+                    await context.bot.send_audio(chat_id, f, caption=caption)
                 else:
-                    await context.bot.send_video(chat_id, f, supports_streaming=True)
+                    await context.bot.send_video(
+                        chat_id, f, caption=caption, supports_streaming=True
+                    )
         await query.message.delete()
     except Exception as e:
         await query.edit_message_text(
